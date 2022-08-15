@@ -1,7 +1,10 @@
+import pprint
+import numpy as np
 import tensorflow.compat.v1 as tf
 
 
 # 定义参数，第一个是参数名称，第二个参数是默认值，第三个是参数描述
+# 参数有四种取值：整数integer，浮点数float，字符串string，逻辑值boolean
 flags = tf.app.flags    # 简写
 
 # Data and model checkpoints directories
@@ -25,7 +28,13 @@ flags.DEFINE_float("l2_weight", 0.0, "weight of l2 loss")
 FLAGS = flags.FLAGS
 
 def main(_):
-    print(FLAGS.display_iter)
+    np.random.seed(2022)    # 设置随机种子
+
+    # flags.FLAGS.__flags为包含了所有输入的列表
+    # 当然，也可以单个查询，格式为：FLAGS.参数名
+    pprint.PrettyPrinter().pprint(flags.FLAGS.__flags)  # 打印参数列表
+
+    
 
 if __name__ == '__main__':
     tf.app.run()    #tf.app.run()的作用：先处理flag解析，然后执行main函数
