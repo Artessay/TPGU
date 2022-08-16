@@ -1,7 +1,9 @@
 # import tensorflow.compat.v1 as tf
+from genericpath import exists
 import tensorflow
 import numpy as np
 from pprint import PrettyPrinter
+from os import path, mkdir
 
 import sys
 sys.path.append('../')  # 将系统路径提高一层
@@ -26,8 +28,8 @@ tf.app.flags.DEFINE_integer("output_size", 158, "Output size")  # state size
 
 # Optimization
 tf.app.flags.DEFINE_integer("num_steps", 10, "Number of steps")
-tf.app.flags.DEFINE_float("val_ratio", 0.2, "valid ratio")      # @todo 在大规模数据集上可以改为0.1
-tf.app.flags.DEFINE_integer("batch_size", 1, "The size of batch")
+tf.app.flags.DEFINE_float("val_ratio", 0.2, "valid ratio")          # @todo 在大规模数据集上可以改为0.1
+tf.app.flags.DEFINE_integer("batch_size", 1, "The size of batch")   # 一个批次上的数据量
 tf.app.flags.DEFINE_integer("max_epoch", 50, "Total training epoches")
 tf.app.flags.DEFINE_float("grad_clip", 5., "Clip gradients at this value")
 tf.app.flags.DEFINE_float("learning_rate", 0.001, "Initial learning rate at early stage. [0.001]")
@@ -61,6 +63,16 @@ class cell_config(object):
     steamer_action_pos = burner_action_pos + burner_action_size
     steamer_action_size = 4
 
+def fit_and_evaluate(model, train_set, valid_set, learning_rate, epochs=500):
+    early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+        monitor="val_mae", patience=50, restore_best_weights=True)
+    opt = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
+    model.compile(loss=tf.keras.losses.Huber(), optimizer=opt, metrics=["mae"])
+    history = model.fit(train_set, validation_data=valid_set, epochs=epochs,
+                        callbacks=[early_stopping_cb])
+    valid_loss, valid_mae = model.evaluate(valid_set)
+    return valid_mae * 1e6
+
 def main(_):
     np.random.seed(2022)    # 设置随机种子
 
@@ -84,11 +96,110 @@ def main(_):
 
     # model construction
     tf.reset_default_graph()    # 清除默认图形堆栈并重置全局默认图形
-    rnn_model = RNNSimulatorModel(cell_config=cell_config(), FLAGS=FLAGS)
+    # rnn_model = RNNSimulatorModel(cell_config=cell_config(), FLAGS=FLAGS)
+    # @change
+    LSTM_units = 160
+    rnn_model = tensorflow.keras.Sequential([
+        tensorflow.keras.layers.LSTM(units=LSTM_units, activation='tanh', return_sequences=True, input_shape=[None, FLAGS.input_size]),
+        # tensorflow.keras.layers.LSTM(32, return_sequences=True),
+        # tensorflow.keras.layers.LSTM(32),
+        tensorflow.keras.layers.Dense(FLAGS.output_size)
+    ])
 
-    # print trainable params
+    # print trainable params @debug
     for i in tf.trainable_variables():
         print(i)
+    
+    # count the parameters in our model @debug 显示模型参数个数，仅供提示
+    total_parameters = 0
+    for variable in tf.trainable_variables():
+        # shape is an array of tf.Dimension
+        shape = variable.get_shape()
+        # print(shape)
+        # print(len(shape))
+        variable_parameters = 1
+        for dim in shape:
+            # print(dim)
+            variable_parameters *= dim.value
+        # print(variable_parameters)
+        total_parameters += variable_parameters
+    print('total parameters: {}'.format(total_parameters))
+
+    # path for log saving   指定保存目录
+    model_name = "sim_rnn_lstm_dense"
+    # logdir = './logs/{}-{}-{}-{}-{}-{:.2f}-{:.4f}-{:.2f}-{:.5f}/'.format(
+    #     model_name, cell_config.num_units[0], cell_config.num_units[1], cell_config.num_units[2],
+    #     FLAGS.num_steps, FLAGS.keep_prob, FLAGS.learning_rate, FLAGS.learning_rate_decay, FLAGS.l2_weight)
+    # @change
+    logdir = './logs/{}-{}-{}-{:.2f}-{:.4f}-{:.2f}-{:.5f}/'.format(
+        model_name, LSTM_units, FLAGS.num_steps, FLAGS.keep_prob, FLAGS.learning_rate, FLAGS.learning_rate_decay, FLAGS.l2_weight)
+    model_dir = logdir + 'saved_models/'
+
+    # 创建保存结果的文件夹
+    if not path.exists(logdir):
+        mkdir(logdir)
+    if not path.exists(model_dir):
+        mkdir(model_dir)
+    # results_dir = logdir + 'results/' # @todo not used
+
+    # 开始训练！
+    
+    # with tf.Session(config=run_config) as sess:
+    #     summary_writer = tf.summary.FileWriter(logdir)
+
+    #     sess.run(tf.global_variables_initializer())     # 初始化全局变量
+    #     saver = tf.train.Saver()
+
+    #     iter = 0
+    #     valid_losses = [np.inf]
+
+    #     for i in range(FLAGS.max_epoch):
+    #         print('----------epoch {}-----------'.format(i))
+    #         # learning_rate = FLAGS.learning_rate
+    #         learning_rate = FLAGS.learning_rate * (
+    #             FLAGS.learning_rate_decay ** i
+    #         )
+
+    #         for batch_X, batch_y in boiler_dataset.generate_one_epoch(train_X, train_y, FLAGS.batch_size):
+    #             iter += 1
+    #             train_data_feed = {
+    #                 rnn_model.learning_rate: learning_rate,
+    #                 rnn_model.keep_prob: FLAGS.keep_prob,
+    #                 rnn_model.inputs: batch_X,
+    #                 rnn_model.targets: batch_y,
+    #             }
+    #             train_loss, _, merged_summ = sess.run(
+    #                 [rnn_model.loss, rnn_model.train_opt, rnn_model.merged_summ], train_data_feed)
+    #             if iter % FLAGS.save_log_iter == 0:
+    #                 summary_writer.add_summary(merged_summ, iter)
+    #             if iter % FLAGS.display_iter == 0:
+    #                 valid_loss = 0
+    #                 for val_batch_X, val_batch_y in boiler_dataset.generate_one_epoch(valid_X, valid_y, FLAGS.batch_size):
+    #                     val_data_feed = {
+    #                         rnn_model.keep_prob: 1.0,
+    #                         rnn_model.inputs: val_batch_X,
+    #                         rnn_model.targets: val_batch_y,
+    #                     }
+    #                     batch_loss = sess.run(rnn_model.loss, val_data_feed)
+    #                     valid_loss += batch_loss
+    #                 num_batches = int(len(valid_X)) // FLAGS.batch_size
+    #                 valid_loss /= num_batches
+    #                 valid_losses.append(valid_loss)
+    #                 valid_loss_sum = tf.Summary(
+    #                     value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_loss)])
+    #                 summary_writer.add_summary(valid_loss_sum, iter)
+
+    #                 if valid_loss < min(valid_losses[:-1]):
+    #                     print('iter {}\tvalid_loss = {:.6f}\tmodel saved!!'.format(
+    #                         iter, valid_loss))
+    #                     saver.save(sess, model_dir +
+    #                                'model_{}.ckpt'.format(iter))
+    #                     saver.save(sess, model_dir + 'final_model.ckpt')
+    #                 else:
+    #                     print('iter {}\tvalid_loss = {:.6f}\t'.format(
+    #                         iter, valid_loss))
+
+    # print('stop training !!!')
 
 if __name__ == '__main__':
     #tf.app.run()的作用：先处理flag解析，然后执行main函数
