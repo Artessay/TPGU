@@ -21,6 +21,19 @@ class BoilerDataSet(object):
         csv_path = os.path.join("data", "sim_train.csv")
         self.raw_data = pd.read_csv(csv_path, index_col='时间戳')
 
+        # sort csv file
+        cols = self.raw_data.columns.tolist()
+        # print("origin len: {0}".format(len(cols)))
+        cols = (cols[51:52] + cols[53:59] + cols [60:61] + cols[62:63] + cols[150:152]   # external input 
+            + cols[0:50] + cols[52:53] + cols[122:139]  # Coal Pulverizing state
+            + cols[50:51] + cols[59:60] + cols[61:62] + cols[63:101] + cols[112:114] + cols[118:122] + cols[139:145] + cols[146:149] + cols[152:158]    # Burning state
+            + cols[101:112] + cols[114:118] + cols[145:146] + cols[149:150] # Steam Circulation state
+            + cols[158:173] + cols[196:202] # Coal Pulverizing action
+            + cols[173:192]                 # Burning action
+            + cols[192:196])                # Steam Circulation action
+        # print("ordered len: {0}".format(len(cols)))
+        self.raw_data = self.raw_data[cols]
+
         # 划分训练集和测试集
         self.train_X, self.train_y, self.valid_X, self.valid_y = self.prepare_data(self.raw_data)
 

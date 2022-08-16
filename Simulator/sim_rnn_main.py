@@ -1,11 +1,16 @@
-import tensorflow.compat.v1 as tf
+# import tensorflow.compat.v1 as tf
+import tensorflow
 import numpy as np
 from pprint import PrettyPrinter
 
 import sys
 sys.path.append('../')  # 将系统路径提高一层
-from Simulator.data_model import BoilerDataSet
 
+from Simulator.data_model import BoilerDataSet
+from sim_rnn_model import RNNSimulatorModel
+
+tf = tensorflow.compat.v1
+tf.disable_eager_execution()
 # tf.disable_v2_behavior()
 
 # 定义参数，第一个是参数名称，第二个参数是默认值，第三个是参数描述
@@ -16,8 +21,8 @@ tf.app.flags.DEFINE_integer("display_iter", 200, "display_iter")
 tf.app.flags.DEFINE_integer("save_log_iter", 100, "save_log_iter")
 
 # Model params
-tf.app.flags.DEFINE_integer("input_size", 109, "Input size")  # external_input + state + action
-tf.app.flags.DEFINE_integer("output_size", 47, "Output size")  # state size
+tf.app.flags.DEFINE_integer("input_size", 202, "Input size")  # external_input + state + action
+tf.app.flags.DEFINE_integer("output_size", 158, "Output size")  # state size
 
 # Optimization
 tf.app.flags.DEFINE_integer("num_steps", 10, "Number of steps")
@@ -31,6 +36,30 @@ tf.app.flags.DEFINE_float("keep_prob", 1, "Keep probability of input data and dr
 tf.app.flags.DEFINE_float("l2_weight", 0.0, "weight of l2 loss")
 
 FLAGS = tf.app.flags.FLAGS
+
+class cell_config(object):
+    """ Simulator Cell config """
+    # list, [coaler_num_units, burner_num_units, steamer_num_units]
+    num_units = [128, 128, 64]   # 各层神经元数量
+
+    # data is [external_input, state(coaler, burner, steamer), action(coaler, burner, steamer)]
+    # data size is [11, 147(68, 62, 17), 44(21, 19, 4)]. Total size is 202
+    external_state_pos = 0
+    external_state_size = 11
+    
+    coaler_state_pos = external_state_pos + external_state_size
+    coaler_state_size = 68
+    burner_state_pos = coaler_state_pos + coaler_state_size
+    burner_state_size = 62
+    steamer_state_pos = burner_state_pos + burner_state_size
+    steamer_state_size = 17
+
+    coaler_action_pos = steamer_state_pos + steamer_state_size
+    coaler_action_size = 21
+    burner_action_pos = coaler_action_pos + coaler_action_size
+    burner_action_size = 19
+    steamer_action_pos = burner_action_pos + burner_action_size
+    steamer_action_size = 4
 
 def main(_):
     np.random.seed(2022)    # 设置随机种子
@@ -49,9 +78,18 @@ def main(_):
     train_X, train_y = boiler_dataset.train_X, boiler_dataset.train_y
     valid_X, valid_y = boiler_dataset.valid_X, boiler_dataset.valid_y
 
-    # 打印数据信息 @debug
+    # print dataset info 打印数据信息 @debug
     print('train samples: {0}'.format(len(train_X)))
     print('valid samples: {0}'.format(len(valid_X)))
 
+    # model construction
+    tf.reset_default_graph()    # 清除默认图形堆栈并重置全局默认图形
+    rnn_model = RNNSimulatorModel(cell_config=cell_config(), FLAGS=FLAGS)
+
+    # print trainable params
+    for i in tf.trainable_variables():
+        print(i)
+
 if __name__ == '__main__':
-    tf.app.run()    #tf.app.run()的作用：先处理flag解析，然后执行main函数
+    #tf.app.run()的作用：先处理flag解析，然后执行main函数
+    tf.app.run()
