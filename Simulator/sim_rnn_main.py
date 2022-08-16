@@ -63,15 +63,21 @@ class cell_config(object):
     steamer_action_pos = burner_action_pos + burner_action_size
     steamer_action_size = 4
 
-def fit_and_evaluate(model, train_set, valid_set, learning_rate, epochs=500):
+def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, learning_rate, epochs=500):
+    print("=============== epoch ================")
     early_stopping_cb = tf.keras.callbacks.EarlyStopping(
         monitor="val_mae", patience=50, restore_best_weights=True)
     opt = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
     model.compile(loss=tf.keras.losses.Huber(), optimizer=opt, metrics=["mae"])
-    history = model.fit(train_set, validation_data=valid_set, epochs=epochs,
-                        callbacks=[early_stopping_cb])
-    valid_loss, valid_mae = model.evaluate(valid_set)
-    return valid_mae * 1e6
+    history = model.fit(x=train_X, 
+                    y=train_y, 
+                    # validation_data=valid_X, 
+                    epochs=epochs,
+                    callbacks=[early_stopping_cb])
+    # valid_loss, valid_mae = model.evaluate(valid_y)
+    # print("loss: {}".format(valid_loss))
+    # print("mae : {}".format(valid_mae))
+    # return valid_mae * 1e6
 
 def main(_):
     np.random.seed(2022)    # 设置随机种子
@@ -111,19 +117,19 @@ def main(_):
         print(i)
     
     # count the parameters in our model @debug 显示模型参数个数，仅供提示
-    total_parameters = 0
-    for variable in tf.trainable_variables():
-        # shape is an array of tf.Dimension
-        shape = variable.get_shape()
-        # print(shape)
-        # print(len(shape))
-        variable_parameters = 1
-        for dim in shape:
-            # print(dim)
-            variable_parameters *= dim.value
-        # print(variable_parameters)
-        total_parameters += variable_parameters
-    print('total parameters: {}'.format(total_parameters))
+    # total_parameters = 0
+    # for variable in tf.trainable_variables():
+    #     # shape is an array of tf.Dimension
+    #     shape = variable.get_shape()
+    #     # print(shape)
+    #     # print(len(shape))
+    #     variable_parameters = 1
+    #     for dim in shape:
+    #         # print(dim)
+    #         variable_parameters *= dim.value
+    #     # print(variable_parameters)
+    #     total_parameters += variable_parameters
+    # print('total parameters: {}'.format(total_parameters))
 
     # path for log saving   指定保存目录
     model_name = "sim_rnn_lstm_dense"
@@ -136,6 +142,8 @@ def main(_):
     model_dir = logdir + 'saved_models/'
 
     # 创建保存结果的文件夹
+    if not path.exists('./logs'):
+        mkdir('./logs')
     if not path.exists(logdir):
         mkdir(logdir)
     if not path.exists(model_dir):
@@ -143,7 +151,7 @@ def main(_):
     # results_dir = logdir + 'results/' # @todo not used
 
     # 开始训练！
-    
+    fit_and_evaluate(rnn_model, train_X, train_y, valid_X, valid_y, learning_rate=FLAGS.learning_rate, epochs=FLAGS.max_epoch)
     # with tf.Session(config=run_config) as sess:
     #     summary_writer = tf.summary.FileWriter(logdir)
 
