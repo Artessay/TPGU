@@ -25,7 +25,10 @@ class RNNSimulatorModel(object):
         self.learning_rate = tf.placeholder(tf.float32, None, name="learning_rate")
         self.keep_prob = tf.placeholder(tf.float32, None, name="keep_prob")
 
-        self.cell = SimulatorRNNCell(cell_config, self.keep_prob)
+        # @todo
+        self.cell = tf.nn.rnn_cell.BasicRNNCell(num_units=cell_config.num_units)
+        # self.cell = SimulatorRNNCell(cell_config, self.keep_prob)
+
         # Run dynamic RNN
         self.cell_init_state = self.cell.zero_state(self.batch_size, dtype=tf.float32)
         cell_outputs, cell_final_state = tf.nn.dynamic_rnn(

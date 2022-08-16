@@ -24,7 +24,8 @@ from tensorflow.python.ops.rnn_cell_impl import LSTMStateTuple
 # from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.ops.rnn_cell_impl import _zero_state_tensors
 
-RNNCell = tf.compat.v1.nn.rnn_cell.BasicRNNCell
+# RNNCell = tf.compat.v1.nn.rnn_cell.BasicRNNCell
+RNNCell = tf.keras.layers.SimpleRNNCell
 
 # Layer RNN Cell 抽象类，继承自tensorflow的RNNCell类
 class LayerRNNCell(RNNCell):
@@ -91,8 +92,9 @@ class SimulatorRNNCell(LayerRNNCell):
           num_units: list, [coaler_num_units, burner_num_units, steamer_num_units]
         """
         
-        # 继承父类的init方法
-        super(SimulatorRNNCell, self).__init__(_reuse=reuse, name=name)
+        # 继承父类的父类的init方法，即BasicRNNCell
+        super(SimulatorRNNCell, self).__init__(num_units=cell_config.num_units)
+        # super(SimulatorRNNCell, self).__init__(num_units=cell_config.num_units, _reuse=reuse, name=name)
         
         # Inputs must be 2-dimensional.
         self.input_spec = base_layer.InputSpec(ndim=2)
