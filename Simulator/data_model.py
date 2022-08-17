@@ -46,8 +46,10 @@ class BoilerDataSet(object):
 
         # 取出输出数据，预测第num_steps步的值训练，ix / loc 可以通过行号和行标签进行索引
         # 这里只要对状态量进行预测即可，0-157列为 'A磨煤机电流':'大渣可燃物含量'
-        y = np.array([data.iloc[i + self.num_steps, 0:158].values
+        y = np.array([data.iloc[i+1: i+self.num_steps+1, 0:158].values
                     for i in range(len(data) - self.num_steps)])
+        # y = np.array([data.iloc[i + self.num_steps, 0:158].values
+        #             for i in range(len(data) - self.num_steps)])
 
         train_size = int(len(X) * (1.0 - self.val_ratio))
         train_X, valid_X = X[:train_size], X[train_size:]
