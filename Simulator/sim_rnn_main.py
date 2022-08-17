@@ -151,61 +151,61 @@ def main(_):
     # results_dir = logdir + 'results/' # @todo not used
 
     # 开始训练！
-    fit_and_evaluate(rnn_model, train_X, train_y, valid_X, valid_y, learning_rate=FLAGS.learning_rate, epochs=FLAGS.max_epoch)
-    # with tf.Session(config=run_config) as sess:
-    #     summary_writer = tf.summary.FileWriter(logdir)
+    # fit_and_evaluate(rnn_model, train_X, train_y, valid_X, valid_y, learning_rate=FLAGS.learning_rate, epochs=FLAGS.max_epoch)
+    with tf.Session(config=run_config) as sess:
+        summary_writer = tf.summary.FileWriter(logdir)
 
-    #     sess.run(tf.global_variables_initializer())     # 初始化全局变量
-    #     saver = tf.train.Saver()
+        sess.run(tf.global_variables_initializer())     # 初始化全局变量
+        saver = tf.train.Saver()
 
-    #     iter = 0
-    #     valid_losses = [np.inf]
+        iter = 0
+        valid_losses = [np.inf]
 
-    #     for i in range(FLAGS.max_epoch):
-    #         print('----------epoch {}-----------'.format(i))
-    #         # learning_rate = FLAGS.learning_rate
-    #         learning_rate = FLAGS.learning_rate * (   # @todo 加入遗忘
-    #             FLAGS.learning_rate_decay ** i
-    #         )
+        for i in range(FLAGS.max_epoch):
+            print('----------epoch {}-----------'.format(i))
+            # learning_rate = FLAGS.learning_rate
+            learning_rate = FLAGS.learning_rate * (   # @todo 加入遗忘
+                FLAGS.learning_rate_decay ** i
+            )
 
-    #         for batch_X, batch_y in boiler_dataset.generate_one_epoch(train_X, train_y, FLAGS.batch_size):
-    #             iter += 1
-    #             train_data_feed = {
-    #                 rnn_model.learning_rate: learning_rate,
-    #                 rnn_model.keep_prob: FLAGS.keep_prob,
-    #                 rnn_model.inputs: batch_X,
-    #                 rnn_model.targets: batch_y,
-    #             }
-    #             train_loss, _, merged_summ = sess.run(
-    #                 [rnn_model.loss, rnn_model.train_opt, rnn_model.merged_summ], train_data_feed)
-    #             if iter % FLAGS.save_log_iter == 0:
-    #                 summary_writer.add_summary(merged_summ, iter)
-    #             if iter % FLAGS.display_iter == 0:
-    #                 valid_loss = 0
-    #                 for val_batch_X, val_batch_y in boiler_dataset.generate_one_epoch(valid_X, valid_y, FLAGS.batch_size):
-    #                     val_data_feed = {
-    #                         rnn_model.keep_prob: 1.0,
-    #                         rnn_model.inputs: val_batch_X,
-    #                         rnn_model.targets: val_batch_y,
-    #                     }
-    #                     batch_loss = sess.run(rnn_model.loss, val_data_feed)
-    #                     valid_loss += batch_loss
-    #                 num_batches = int(len(valid_X)) // FLAGS.batch_size
-    #                 valid_loss /= num_batches
-    #                 valid_losses.append(valid_loss)
-    #                 valid_loss_sum = tf.Summary(
-    #                     value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_loss)])
-    #                 summary_writer.add_summary(valid_loss_sum, iter)
+            for batch_X, batch_y in boiler_dataset.generate_one_epoch(train_X, train_y, FLAGS.batch_size):
+                iter += 1
+                train_data_feed = {
+                    rnn_model.learning_rate: learning_rate,
+                    rnn_model.keep_prob: FLAGS.keep_prob,
+                    rnn_model.inputs: batch_X,
+                    rnn_model.targets: batch_y,
+                }
+                train_loss, _, merged_summ = sess.run(
+                    [rnn_model.loss, rnn_model.train_opt, rnn_model.merged_summ], train_data_feed)
+                if iter % FLAGS.save_log_iter == 0:
+                    summary_writer.add_summary(merged_summ, iter)
+                if iter % FLAGS.display_iter == 0:
+                    valid_loss = 0
+                    for val_batch_X, val_batch_y in boiler_dataset.generate_one_epoch(valid_X, valid_y, FLAGS.batch_size):
+                        val_data_feed = {
+                            rnn_model.keep_prob: 1.0,
+                            rnn_model.inputs: val_batch_X,
+                            rnn_model.targets: val_batch_y,
+                        }
+                        batch_loss = sess.run(rnn_model.loss, val_data_feed)
+                        valid_loss += batch_loss
+                    num_batches = int(len(valid_X)) // FLAGS.batch_size
+                    valid_loss /= num_batches
+                    valid_losses.append(valid_loss)
+                    valid_loss_sum = tf.Summary(
+                        value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_loss)])
+                    summary_writer.add_summary(valid_loss_sum, iter)
 
-    #                 if valid_loss < min(valid_losses[:-1]):
-    #                     print('iter {}\tvalid_loss = {:.6f}\tmodel saved!!'.format(
-    #                         iter, valid_loss))
-    #                     saver.save(sess, model_dir +
-    #                                'model_{}.ckpt'.format(iter))
-    #                     saver.save(sess, model_dir + 'final_model.ckpt')
-    #                 else:
-    #                     print('iter {}\tvalid_loss = {:.6f}\t'.format(
-    #                         iter, valid_loss))
+                    if valid_loss < min(valid_losses[:-1]):
+                        print('iter {}\tvalid_loss = {:.6f}\tmodel saved!!'.format(
+                            iter, valid_loss))
+                        saver.save(sess, model_dir +
+                                   'model_{}.ckpt'.format(iter))
+                        saver.save(sess, model_dir + 'final_model.ckpt')
+                    else:
+                        print('iter {}\tvalid_loss = {:.6f}\t'.format(
+                            iter, valid_loss))
 
     # print('stop training !!!')
 
