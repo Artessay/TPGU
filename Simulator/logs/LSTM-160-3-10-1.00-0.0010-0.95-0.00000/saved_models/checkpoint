@@ -1,3 +1,6 @@
 model_checkpoint_path: "final_model.ckpt"
-all_model_checkpoint_paths: "model_200.ckpt"
+all_model_checkpoint_paths: "model_4400.ckpt"
+all_model_checkpoint_paths: "model_5400.ckpt"
+all_model_checkpoint_paths: "model_5600.ckpt"
+all_model_checkpoint_paths: "model_7600.ckpt"
 all_model_checkpoint_paths: "final_model.ckpt"
