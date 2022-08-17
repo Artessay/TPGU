@@ -164,7 +164,7 @@ def main(_):
     #     for i in range(FLAGS.max_epoch):
     #         print('----------epoch {}-----------'.format(i))
     #         # learning_rate = FLAGS.learning_rate
-    #         learning_rate = FLAGS.learning_rate * (
+    #         learning_rate = FLAGS.learning_rate * (   # @todo 加入遗忘
     #             FLAGS.learning_rate_decay ** i
     #         )
 
