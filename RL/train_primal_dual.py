@@ -5,8 +5,8 @@ tf.experimental.output_all_intermediates(True)
 
 import sys
 sys.path.append('../')
-# from RL.primal_dual_ddpg import *
-# from RL.env import *
+from RL.primal_dual_ddpg import *
+from RL.env import *
 
 SIM_REAL_RATIO = 1
 
