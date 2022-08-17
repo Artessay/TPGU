@@ -1,5 +1,3 @@
-# import tensorflow.compat.v1 as tf
-from genericpath import exists
 import tensorflow
 import numpy as np
 from pprint import PrettyPrinter
@@ -13,6 +11,7 @@ from sim_rnn_model import RNNSimulatorModel
 
 tf = tensorflow.compat.v1
 tf.disable_eager_execution()
+tf.experimental.output_all_intermediates(True)
 # tf.disable_v2_behavior()
 
 # 定义参数，第一个是参数名称，第二个参数是默认值，第三个是参数描述

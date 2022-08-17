@@ -1,7 +1,7 @@
-import os
 import random
 import numpy as np
 import pandas as pd
+from os import path
 
 
 class BoilerDataSet(object):
@@ -18,7 +18,7 @@ class BoilerDataSet(object):
         self.val_ratio = val_ratio  # 训练集与测试集比例
         
         # Read csv file
-        csv_path = os.path.join("data", "sim_train.csv")
+        csv_path = path.join("data", "sim_train.csv")
         self.raw_data = pd.read_csv(csv_path, index_col='时间戳')
 
         # sort csv file
