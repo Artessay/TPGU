@@ -21,14 +21,15 @@ class RNNSimulatorModel(object):
         
         # inputs.shape = (number of examples, number of input, dimension of each input).
         self.inputs = tf.placeholder(tf.float32, [None, self.n_steps, self.input_size], name="inputs")      # input layer
-        self.targets = tf.placeholder(tf.float32, [None, self.n_steps, self.output_size], name="targets")   # output layer
+        self.targets = tf.placeholder(tf.float32, [None, self.output_size], name="targets")   # output layer
         self.learning_rate = tf.placeholder(tf.float32, None, name="learning_rate")
         self.keep_prob = tf.placeholder(tf.float32, None, name="keep_prob")
 
         # cell frame
-        self.rnn_layer = tensorflow.keras.layers.RNN(
-            [tensorflow.keras.layers.LSTMCell(128),
-             tensorflow.keras.layers.LSTMCell(256)])
+        self.rnn_layer = tensorflow.keras.layers.RNN([
+            tensorflow.keras.layers.LSTMCell(128),
+            tensorflow.keras.layers.LSTMCell(256)
+        ])
 
         # Run dynamic RNN
         rnn_outputs = self.rnn_layer(self.inputs)
