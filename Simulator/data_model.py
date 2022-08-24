@@ -1,7 +1,6 @@
 import random
 import numpy as np
 import pandas as pd
-from os import path
 
 
 class BoilerDataSet(object):
@@ -11,15 +10,14 @@ class BoilerDataSet(object):
     simple version(small action dimension)
 
     """
-    # @todo 还未归一化和随机化
+    # @todo 还未归一化
     
     def __init__(self, num_steps, val_ratio=0.1):
-        self.num_steps = num_steps  # 历史步长
-        self.val_ratio = val_ratio  # 训练集与测试集比例
+        self.num_steps = num_steps  # time steps
+        self.val_ratio = val_ratio  # train test ratio
         
         # Read csv file
-        csv_path = path.join("data", "sim_train.csv")
-        self.raw_data = pd.read_csv(csv_path, index_col='时间戳')
+        self.raw_data = pd.read_csv("./data/sim_train.csv", index_col='时间戳')
 
         # sort csv file
         cols = self.raw_data.columns.tolist()
@@ -34,22 +32,20 @@ class BoilerDataSet(object):
         # print("ordered len: {0}".format(len(cols)))
         self.raw_data = self.raw_data[cols]
 
-        # 划分训练集和测试集
+        # divide train set and valid set
         self.train_X, self.train_y, self.valid_X, self.valid_y = self.prepare_data(self.raw_data)
 
     def prepare_data(self, data):
         # split into groups of num_steps
 
-        # 取出输入数据，学习num_steps步长的历史，iloc：通过行号获取行数据
+        # Fetch input data with num_steps history
         X = np.array([data.iloc[i: i + self.num_steps].values
                     for i in range(len(data) - self.num_steps)])
 
-        # 取出输出数据，预测第num_steps步的值训练，ix / loc 可以通过行号和行标签进行索引
-        # 这里只要对状态量进行预测即可，0-157列为 'A磨煤机电流':'大渣可燃物含量'
-        y = np.array([data.iloc[i+1: i+self.num_steps+1, 0:158].values
+        # Fetch output data, predict num_steps value
+        # state value only, 0-157 columns are state values
+        y = np.array([data.iloc[i + self.num_steps, 0:158].values
                     for i in range(len(data) - self.num_steps)])
-        # y = np.array([data.iloc[i + self.num_steps, 0:158].values
-        #             for i in range(len(data) - self.num_steps)])
 
         train_size = int(len(X) * (1.0 - self.val_ratio))
         train_X, valid_X = X[:train_size], X[train_size:]

@@ -6,27 +6,68 @@ from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
 from tensorflow.python.layers import base as base_layer
-# from tensorflow.contrib.rnn import RNNCell
-# from tensorflow.contrib.rnn import LSTMCell
-# from tensorflow.contrib.rnn import GRUCell
 from tensorflow.python.ops import array_ops
-# from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
-# from tensorflow.python.ops import partitioned_variables
-# from tensorflow.python.ops import random_ops
-# from tensorflow.python.ops import tensor_array_ops
-# from tensorflow.python.ops import variable_scope as vs
-# from tensorflow.python.ops import variables as tf_variables
 from tensorflow.python.ops.rnn_cell_impl import LSTMStateTuple
-# from tensorflow.python.util import nest
-# from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.ops.rnn_cell_impl import _zero_state_tensors
 
-# RNNCell = tf.compat.v1.nn.rnn_cell.BasicRNNCell
 RNNCell = tf.keras.layers.SimpleRNNCell
 
+class SimulatorRNNCell(tf.keras.layers.Layer):
+    def __init__(self, units, activation="tanh", **kwargs):
+        super().__init__(**kwargs)
+        self.state_size = units
+        self.output_size = units
+        self.rnn_cell = tf.keras.layers.LSTMCell(units)
+        self.layer_norm = tf.keras.layers.LayerNormalization()
+        self.activation = tf.keras.activations.get(activation)
+
+    def call(self, inputs, states):
+        outputs, new_states = self.rnn_cell(inputs, states)
+        norm_outputs = self.activation(self.layer_norm(outputs))
+        return norm_outputs, [norm_outputs]
+
+class SimulatorRNNLayer(tf.keras.layers.Layer):
+    def __init__(self, cell, return_sequences=False, **kwargs):
+        super().__init__(**kwargs)
+        self.cell = cell
+        self.return_sequences = return_sequences
+
+    def get_initial_state(self, inputs):
+        try:
+            return self.cell.get_initial_state(inputs)
+        except AttributeError:
+            # fallback to zeros if self.cell has no get_initial_state() method
+            batch_size = tf.shape(inputs)[0]
+            return [tf.zeros([batch_size, self.cell.state_size],
+                             dtype=inputs.dtype)]
+
+    @tf.function
+    def call(self, inputs):
+        states = self.get_initial_state(inputs)
+        shape = tf.shape(inputs)
+        batch_size = shape[0]
+        n_steps = shape[1]
+        sequences = tf.TensorArray(
+            inputs.dtype, size=(n_steps if self.return_sequences else 0))
+        outputs = tf.zeros(shape=[batch_size, self.cell.output_size],
+                           dtype=inputs.dtype)
+        for step in tf.range(n_steps):
+            outputs, states = self.cell(inputs[:, step], states)
+            if self.return_sequences:
+                sequences = sequences.write(step, outputs)
+
+        if self.return_sequences:
+            # stack the outputs into an array of shape
+            # [time steps, batch size, dims], then transpose it to shape
+            # [batch size, time steps, dims]
+            return tf.transpose(sequences.stack(), [1, 0, 2])
+        else:
+            return outputs
+
+# ################################################ old version ###############################################
 from tensorflow import keras
 class MinimalRNNCell(keras.layers.Layer):
 
@@ -107,7 +148,7 @@ class LayerRNNCell(RNNCell):
                                      *args, **kwargs)
 
 
-class SimulatorRNNCell(LayerRNNCell):
+class SimulatorRNNCell_old(LayerRNNCell):
     """
     coaler RNN: (external_input_t, coaler_hidden_t-1 , coaler_action_t) --> (coaler_hidden_t, coaler_cell_t)
     burner RNN: (coaler_hidden_t, burner_hidden_t-1 , burner_action_t) --> (burner_hidden_t, burner_cell_t)
@@ -131,8 +172,7 @@ class SimulatorRNNCell(LayerRNNCell):
         """
         
         # 继承父类的父类的init方法，即BasicRNNCell
-        super(SimulatorRNNCell, self).__init__(num_units=cell_config.num_units)
-        # super(SimulatorRNNCell, self).__init__(num_units=cell_config.num_units, _reuse=reuse, name=name)
+        super(SimulatorRNNCell_old, self).__init__(num_units=cell_config.num_units)
         
         # Inputs must be 2-dimensional.
         self.input_spec = base_layer.InputSpec(ndim=2)
