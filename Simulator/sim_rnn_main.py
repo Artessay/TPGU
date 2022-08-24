@@ -1,8 +1,10 @@
-import tensorflow as tf
+import os
 import numpy as np
+import tensorflow as tf
+
 
 import sys
-sys.path.append('../')  # 将系统路径提高一层
+sys.path.append('../')  # rise system path
 
 from Simulator.data_model import BoilerDataSet
 from Simulator.sim_rnn_model import SimulatorRNNModel
@@ -16,10 +18,12 @@ class sim_config(object):
     num_layers = 3
     output_size = 158
 
+    keep_prob = 1
     learning_rate = 0.001
     learning_rate_decay = 0.95
+    l2_weight = 0
 
-    max_epoch = 50
+    max_epoch = 100
     batch_size = 1
 
     save_log_iter = 10
@@ -53,7 +57,7 @@ def reset_random_seed(seed=2022):
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, epochs=500):
+def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, model_dir, batch_size, epochs=500):
     callback_list = [
         tf.keras.callbacks.EarlyStopping(
             monitor="val_loss", 
@@ -61,7 +65,7 @@ def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, epochs=500):
             restore_best_weights=True
         ),
         tf.keras.callbacks.ModelCheckpoint(
-            filepath='./logs/LSTM/saved_models/model-{epoch:02d}-{val_loss:.4f}.h5',
+            filepath= os.path.join(model_dir, 'model-{epoch:02d}-{val_loss:.4f}.h5'),
             monitor="val_loss",
             verbose=1,
             save_weights_only=True,
@@ -72,13 +76,14 @@ def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, epochs=500):
     
     history = model.fit(
         x=train_X, y=train_y,
+        batch_size=batch_size,
         epochs=epochs, 
         validation_data=(valid_X, valid_y),
         callbacks=callback_list)
     # valid_loss, valid_mae = model.evaluate(x=valid_X, y=valid_y) # Returns the loss value & metrics values for the model in test mode
     # return valid_mae * 1e6  # valid mean absolute error
 
-def main(sim_config):
+def main():
     """
     use self compiled tensorflow library will improve speed. The command line to build it is:
     bazel build -c opt --copt=-mavx --copt=-mavx2 --copt=-mfma --copt=-mfpmath=both --copt=-msse4.2 --config=cuda -k //tensorflow/tools/pip_package:build_pip_package
@@ -91,6 +96,7 @@ def main(sim_config):
     # get parameters
     num_steps = sim_config.num_steps
     valid_ratio = sim_config.valid_ratio
+    batch_size = sim_config.batch_size
     max_epoch = sim_config.max_epoch
 
     # read data
@@ -99,11 +105,30 @@ def main(sim_config):
     valid_X, valid_y = boiler_dataset.valid_X, boiler_dataset.valid_y
 
     # prepare model
-    model = SimulatorRNNModel(sim_config=sim_config)
+    model = SimulatorRNNModel(sim_config=sim_config())
     model.summary()
+
+    # path for log saving
+    model_name = "LSTM"
+    logdir = './logs/{}-{}-{}-{}-{}-{:.2f}-{:.4f}-{:.2f}-{:.5f}/'.format(
+        model_name, cell_config.num_units[0], cell_config.num_units[1], cell_config.num_units[2],
+        sim_config.num_steps, sim_config.keep_prob, sim_config.learning_rate, sim_config.learning_rate_decay, sim_config.l2_weight)
+    model_dir = logdir + 'saved_models/'
+    results_dir = logdir + 'results/'
+
+    # create folders
+    if not os.path.exists('./logs'):
+        os.mkdir('./logs')
+    if not os.path.exists(logdir):
+        os.mkdir(logdir)
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+    if not os.path.exists(results_dir):
+        os.mkdir(results_dir)
     
     # train model
-    fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, max_epoch)
+    fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, model_dir, batch_size, max_epoch)
+    model.save(results_dir)
 
 if __name__ == '__main__':
-    main(sim_config=sim_config())
+    main()
