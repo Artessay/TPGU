@@ -75,12 +75,20 @@ def fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, epochs=500):
         epochs=epochs, 
         validation_data=(valid_X, valid_y),
         callbacks=callback_list)
-    valid_loss, valid_mae = model.evaluate(x=valid_X, y=valid_y) # Returns the loss value & metrics values for the model in test mode
-    return valid_mae * 1e6  # valid mean absolute error
+    # valid_loss, valid_mae = model.evaluate(x=valid_X, y=valid_y) # Returns the loss value & metrics values for the model in test mode
+    # return valid_mae * 1e6  # valid mean absolute error
 
 def main(sim_config):
-    reset_random_seed()    # set random seed
+    """
+    use self compiled tensorflow library will improve speed. The command line to build it is:
+    bazel build -c opt --copt=-mavx --copt=-mavx2 --copt=-mfma --copt=-mfpmath=both --copt=-msse4.2 --config=cuda -k //tensorflow/tools/pip_package:build_pip_package
+    Of course, the code could run in tensorflow 2 without it.
+    """
 
+    # set random seed
+    reset_random_seed()    
+
+    # get parameters
     num_steps = sim_config.num_steps
     valid_ratio = sim_config.valid_ratio
     max_epoch = sim_config.max_epoch
@@ -94,6 +102,7 @@ def main(sim_config):
     model = SimulatorRNNModel(sim_config=sim_config)
     model.summary()
     
+    # train model
     fit_and_evaluate(model, train_X, train_y, valid_X, valid_y, max_epoch)
 
 if __name__ == '__main__':
