@@ -5,7 +5,7 @@ import random
 
 from Simulator.sim_rnn_model import RNNSimulatorModel
 from Simulator.sim_rnn_main import cell_config, FLAGS
-from RL.util import *
+from RL.utility import *
 
 OUTER_START_POS = 0
 OUTER_SIZE = 11
