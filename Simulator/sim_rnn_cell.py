@@ -20,9 +20,29 @@ class SimulatorRNNCell(tf.keras.layers.Layer):
         super().__init__(**kwargs)
         self.state_size = units
         self.output_size = units
-        self.rnn_cell = tf.keras.layers.LSTMCell(units)
+        self.rnn_cell = tf.keras.layers.SimpleRNNCell(units, # LSTMCell(units,
+                                                    activation=None)
+        # self.rnn_cell = tf.keras.layers.LSTMCell(units)
         self.layer_norm = tf.keras.layers.LayerNormalization()
         self.activation = tf.keras.activations.get(activation)
+    
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "units": self.units,
+            "activation": self.activation,
+        })
+        return config
+    
+    def build(self, input_shape):
+        self.kernel = self.add_weight(shape=(input_shape[-1], self.units),
+                                      initializer='uniform',
+                                      name='kernel')
+        self.recurrent_kernel = self.add_weight(
+            shape=(self.units, self.units),
+            initializer='uniform',
+            name='recurrent_kernel')
+        self.built = True
 
     def call(self, inputs, states):
         outputs, new_states = self.rnn_cell(inputs, states)

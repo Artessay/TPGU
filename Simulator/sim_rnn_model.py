@@ -10,6 +10,7 @@ def SimulatorRNNModel(sim_config):
     learning_rate_decay = sim_config.learning_rate_decay
 
     model = tf.keras.Sequential([
+        # tf.keras.layers.RNN(SimulatorRNNCell(units=256), input_shape=[num_steps, input_size]),
         tf.keras.layers.Input(shape=[num_steps, input_size], name="inputs"),
         tf.keras.layers.LSTM(256, return_sequences=True),
         tf.keras.layers.LSTM(128),

@@ -18,7 +18,7 @@ LOAD_POS = 46
 EFFI_WEIGHT = 0.8
 
 # Read inv-normlization file
-inv_norm = pd.read_csv('/Users/xhr/PycharmProjects/Boiler/Simulator/data/反归一化_new.csv', index_col='name')
+inv_norm = pd.read_csv('./Simulator/data/agent_data.csv', index_col='name')
 inv_norm_min = inv_norm['min'].values  # convert to ndarray
 inv_norm_max = inv_norm['max'].values  # convert to ndarray
 

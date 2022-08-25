@@ -11,7 +11,7 @@ from Simulator.sim_rnn_model import SimulatorRNNModel
 
 class sim_config(object):
     num_steps = 10
-    valid_ratio = 0.1
+    valid_ratio = 0.2   # 0.1 will be better for large dataset
 
     input_size = 202
     num_neurons = 160
@@ -24,7 +24,7 @@ class sim_config(object):
     decay_steps = 5000
     l2_weight = 0
 
-    max_epoch = 100
+    max_epoch = 50
     batch_size = 1
 
     save_log_iter = 10

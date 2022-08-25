@@ -1,7 +1,7 @@
 from collections import deque
 import random
 import numpy as np
-from RL.util import compute_reward, compute_cost, compute_done
+from RL.utility import compute_reward, compute_cost, compute_done
 
 
 class ReplayBuffer(object):
