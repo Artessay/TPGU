@@ -1,113 +1,34 @@
 import tensorflow as tf
 import numpy as np
+# import collections
+# import hashlib
+# import numbers
 
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
 from tensorflow.python.layers import base as base_layer
+from tensorflow.contrib.rnn import RNNCell
+from tensorflow.contrib.rnn import LSTMCell
+from tensorflow.contrib.rnn import GRUCell
 from tensorflow.python.ops import array_ops
+# from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
+# from tensorflow.python.ops import partitioned_variables
+# from tensorflow.python.ops import random_ops
+# from tensorflow.python.ops import tensor_array_ops
+# from tensorflow.python.ops import variable_scope as vs
+# from tensorflow.python.ops import variables as tf_variables
 from tensorflow.python.ops.rnn_cell_impl import LSTMStateTuple
+# from tensorflow.python.util import nest
+# from tensorflow.python.util.tf_export import tf_export
 from tensorflow.python.ops.rnn_cell_impl import _zero_state_tensors
 
-RNNCell = tf.keras.layers.SimpleRNNCell
 
-class SimulatorRNNCell(tf.keras.layers.Layer):
-    def __init__(self, units, activation="tanh", **kwargs):
-        super().__init__(**kwargs)
-        self.state_size = units
-        self.output_size = units
-        self.rnn_cell = tf.keras.layers.LSTMCell(units)
-        self.layer_norm = tf.keras.layers.LayerNormalization()
-        self.activation = tf.keras.activations.get(activation)
-
-    def call(self, inputs, states):
-        outputs, new_states = self.rnn_cell(inputs, states)
-        norm_outputs = self.activation(self.layer_norm(outputs))
-        return norm_outputs, [norm_outputs]
-
-class SimulatorRNNLayer(tf.keras.layers.Layer):
-    def __init__(self, cell, return_sequences=False, **kwargs):
-        super().__init__(**kwargs)
-        self.cell = cell
-        self.return_sequences = return_sequences
-
-    def get_initial_state(self, inputs):
-        try:
-            return self.cell.get_initial_state(inputs)
-        except AttributeError:
-            # fallback to zeros if self.cell has no get_initial_state() method
-            batch_size = tf.shape(inputs)[0]
-            return [tf.zeros([batch_size, self.cell.state_size],
-                             dtype=inputs.dtype)]
-
-    @tf.function
-    def call(self, inputs):
-        states = self.get_initial_state(inputs)
-        shape = tf.shape(inputs)
-        batch_size = shape[0]
-        n_steps = shape[1]
-        sequences = tf.TensorArray(
-            inputs.dtype, size=(n_steps if self.return_sequences else 0))
-        outputs = tf.zeros(shape=[batch_size, self.cell.output_size],
-                           dtype=inputs.dtype)
-        for step in tf.range(n_steps):
-            outputs, states = self.cell(inputs[:, step], states)
-            if self.return_sequences:
-                sequences = sequences.write(step, outputs)
-
-        if self.return_sequences:
-            # stack the outputs into an array of shape
-            # [time steps, batch size, dims], then transpose it to shape
-            # [batch size, time steps, dims]
-            return tf.transpose(sequences.stack(), [1, 0, 2])
-        else:
-            return outputs
-
-# ################################################ old version ###############################################
-from tensorflow import keras
-class MinimalRNNCell(keras.layers.Layer):
-
-    def __init__(self, units, **kwargs):
-        self.units = units
-        self.state_size = units
-        super(MinimalRNNCell, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.kernel = self.add_weight(shape=(input_shape[-1], self.units),
-                                      initializer='uniform',
-                                      name='kernel')
-        self.recurrent_kernel = self.add_weight(
-            shape=(self.units, self.units),
-            initializer='uniform',
-            name='recurrent_kernel')
-        self.built = True
-
-    def call(self, inputs, states):
-        prev_output = states[0]
-        h = keras.backend.dot(inputs, self.kernel)
-        output = h + keras.backend.dot(prev_output, self.recurrent_kernel)
-        return output, [output]
-
-# Let's use this cell in a RNN layer:
-
-# cell = MinimalRNNCell(32)
-# x = keras.Input((None, 5))
-# layer = RNN(cell)
-# y = layer(x)
-
-# Here's how to use the cell to build a stacked RNN:
-
-# cells = [MinimalRNNCell(32), MinimalRNNCell(64)]
-# x = keras.Input((None, 5))
-# layer = RNN(cells)
-# y = layer(x)
-
-# Layer RNN Cell 抽象类，继承自tensorflow的RNNCell类
-class LayerRNNCell(RNNCell):
+class _LayerRNNCell(RNNCell):
   """Subclass of RNNCells that act like proper `tf.Layer` objects.
 
   For backwards compatibility purposes, most `RNNCell` instances allow their
@@ -148,7 +69,7 @@ class LayerRNNCell(RNNCell):
                                      *args, **kwargs)
 
 
-class SimulatorRNNCell_old(LayerRNNCell):
+class SimulatorRNNCell(_LayerRNNCell):
     """
     coaler RNN: (external_input_t, coaler_hidden_t-1 , coaler_action_t) --> (coaler_hidden_t, coaler_cell_t)
     burner RNN: (coaler_hidden_t, burner_hidden_t-1 , burner_action_t) --> (burner_hidden_t, burner_cell_t)
@@ -169,12 +90,20 @@ class SimulatorRNNCell_old(LayerRNNCell):
         Args:
           cell_config: simulator config
           num_units: list, [coaler_num_units, burner_num_units, steamer_num_units]
+          【NOTE: We add forget_bias (default: 1) to the biases of the forget gate in order to
+            reduce the scale of forgetting at the beginning of the training.】
+            对reuse另一种解释: (optional) Python boolean describing whether to reuse variables
+            in an existing scope.  If not `True`, and the existing scope already has
+            the given variables, an error is raised.
+            name: String, the name of the layer. Layers with the same name will
+            share weights, but to avoid mistakes we require reuse=True in such
+            cases.
         """
-        
-        # 继承父类的父类的init方法，即BasicRNNCell
-        super(SimulatorRNNCell_old, self).__init__(num_units=cell_config.num_units)
-        
-        # Inputs must be 2-dimensional.
+        # 复习：子类重写父类的init又想调用调用父类的init：super(子类名, self).__init__(...)
+        # reuse意思是定义的Layer可以共享参数（即两层的参数一样）
+        # name是啥（可能不重要？）
+        super(SimulatorRNNCell, self).__init__(_reuse=reuse, name=name)
+        # 这是用来检查输入的类型的，Inputs must be 2-dimensional.
         self.input_spec = base_layer.InputSpec(ndim=2)
 
         self._external_state_pos = cell_config.external_state_pos
@@ -199,11 +128,12 @@ class SimulatorRNNCell_old(LayerRNNCell):
         self._burner_num_units = _num_units[1]
         self._steamer_num_units = _num_units[2]
         self._forget_bias = forget_bias
-        self._activation = activation or math_ops.tanh
-        self._input_keep_prob = self._output_keep_prob = keep_prob
+        self._activation = activation or math_ops.tanh # 激活函数
+        self._input_keep_prob = self._output_keep_prob = keep_prob # input和output的keep_prob一样
 
     @property
     def state_size(self):
+        # 这个state_size只给出了call函数中最后的new_h, new_c的列数，没给行数（行数就是batch_size）
         c_tuple = tuple((self._coaler_num_units, self._burner_num_units, self._steamer_num_units))
         h_tuple = tuple((self._coaler_num_units, self._burner_num_units, self._steamer_num_units))
         return LSTMStateTuple(c_tuple, h_tuple)
@@ -214,7 +144,13 @@ class SimulatorRNNCell_old(LayerRNNCell):
 
     def get_coaler_inputs(self, inputs):
         # coaler inputs contains external_input, coaler_state and coaler_action
-        # input: (batch_size, feature_nums)
+        # inputs: (batch_size, feature_nums)
+
+        # tf.slice的使用tf.slice(inputs,begin,size,name='')，从inputs中抽取部分内容
+        # inputs：可以是list,array,tensor
+        # begin：n维列表，begin[i] 表示从inputs中第i维抽取数据时，相对0的起始偏移量，
+        #       也就是从第i维的begin[i]位置开始抽取数据
+        # size：n维列表，size[i]表示要抽取的第i维元素的数目，-1表示一直到底
         external_input = tf.slice(inputs, [0, self._external_state_pos],
                                   [-1, self._external_state_size])
 
@@ -222,6 +158,10 @@ class SimulatorRNNCell_old(LayerRNNCell):
                                 [-1, self._coaler_state_size])
         coaler_action = tf.slice(inputs, [0, self._coaler_action_pos],
                                  [-1, self._coaler_action_size])
+        # tf.concat的使用tf.concat([tensor1, tensor2, tensor3,...], axis)
+        # axis表示在第几维度进行拼接（其他维度的len保持不变）
+        # 最后的shape就是
+        # (batch_size, external_input_feature_nums + coaler_state_feature_nums + coaler_action_feature_nums)
         return tf.concat([external_input, coaler_state, coaler_action], axis=1)
 
     def get_burner_inputs(self, inputs):
@@ -242,15 +182,24 @@ class SimulatorRNNCell_old(LayerRNNCell):
                                   [-1, self._steamer_action_size])
         return tf.concat([steamer_state, steamer_action], axis=1)
 
+    # 官网对__init__和build的解释：
+    # __init__()，您可以在其中执行所有与输入无关的初始化
+    # build()，您可以在其中了解输入张量的形状，并可以执行其余的初始化
+    # call()，在那里进行正向计算。
+    # 请注意，您不必等到调用 build 来创建变量，您也可以在 __init__中创建它们。
+    # 但是，在 build 中创建它们的好处是，它支持根据将要操作的层的输入形状，
+    # 创建后期变量。另一方面，在 __init__ 中创建变量意味着需要明确指定创建变量所需的形状。
     def build(self, inputs_shape):
+        print("\n\n----------------------------build!!!!!!-----------------------------\n\n")
         # coaler
+        # external_...和coaler_...是按照磨煤阶段来分类
         external_input_depth = self._external_state_size
         coaler_input_depth = self._coaler_state_size + self._coaler_action_size
-        self._coaler_kernel = self.add_variable(
-            "coaler_kernel",
+        self._coaler_kernel = self.add_variable( # 卷积核（矩阵乘法中位于右侧）
+            "coaler_kernel", # 变量名
             shape=[external_input_depth + coaler_input_depth + self._coaler_num_units, 4 * self._coaler_num_units],
             initializer=orthogonal_lstm_initializer())
-        self._coaler_bias = self.add_variable(
+        self._coaler_bias = self.add_variable(  # 斜率
             "coaler_bias",
             shape=[4 * self._coaler_num_units],
             initializer=init_ops.zeros_initializer(dtype=self.dtype))
@@ -307,10 +256,14 @@ class SimulatorRNNCell_old(LayerRNNCell):
             output = _zero_state_tensors(state_size, batch_size, dtype)
         if is_eager:
             self._last_zero_state = (state_size, batch_size, dtype, output)
+        # output是一个二元tuple，每一个元素又是一个tuple，
+        # 再往里才是一个个形状为[batch_size, state_size]的tensor
         return output
 
     def call(self, inputs, state):
-        # inputs: (external_input, coaler_input, burner_input, steamer_input)
+        print("\n\n----------------------------call!!!!!!-----------------------------\n\n")
+        # inputs.shape=(batch_size, self.num_steps, self.input_size)
+        # 【如果inputs如上面所说，那接下来都矛盾了。】（下面似乎认为inputs.shape=(batch_size, self.input_size)）
         # state: (c, h) is a 3-D tensor
         # c: (c_coaler, c_burner, c_steamer)
         # h: (h_coaler, h_burner, h_steamer)
@@ -319,9 +272,32 @@ class SimulatorRNNCell_old(LayerRNNCell):
             return (not isinstance(p, float)) or p < 1
 
         # input dropout
+        # 在训练时随机使p*100%的feature detectors不起作用，其他的变成原来的1/(1-rate)倍，防止过拟合
+        # dropout的工作机制：比如
+        """
+        x = tf.Variable([[1, 2, 3],
+                 [4, 5, 6],
+                 [7, 8, 9],
+                 [10, 11, 12]], dtype=tf.float32)
+        keep_prob = 0.5
+        a = tf.nn.dropout(x, keep_prob)
+        print(a)
+        >>> tf.Tensor([[ 2.  4.  6.]
+                    [ 8.  0. 12.]
+                    [ 0.  0. 18.]
+                    [ 0. 22. 24.]], shape=(4, 3), dtype=float32)
+
+        """
+
+        # 先对整个的inputs drop了一轮，接下来【除了coaler以外（为什么这样做？）】每次都会drop一次
         if _should_dropout(self._input_keep_prob):
             inputs = nn_ops.dropout(inputs, keep_prob=self._input_keep_prob)
 
+
+        # 得到一个batch的input
+        # coaler_inputs.shape=(batch_size, external_state_size + coaler_state_size + coaler_action_size)
+        # burner_inputs.shape=(batch_size, burner_state_size + burner_action_size)
+        # steamer_inputs.shape=(batch_size, steamer_state_size + steamer_action_size)
         coaler_inputs = self.get_coaler_inputs(inputs)
         burner_inputs = self.get_burner_inputs(inputs)
         steamer_inputs = self.get_steamer_inputs(inputs)
@@ -329,36 +305,49 @@ class SimulatorRNNCell_old(LayerRNNCell):
         sigmoid = math_ops.sigmoid
         one = constant_op.constant(1, dtype=dtypes.int32)
 
+        # coaler_h.shape=(batch_size, _coaler_num_units)
         c, h = state
         coaler_h, burner_h, steamer_h = h
         coaler_c, burner_c, steamer_c = c
 
         # coal mill model
-        with tf.variable_scope('coaler'):
+        # with上下文变量管理，作用？
+        with tf.compat.v1.variable_scope('coaler'):
             # inputs = self.batch_normalization(inputs, 'coal_mill_bn')
-            coaler_gate_inputs = math_ops.matmul(
+            # matmul是普通的矩阵乘法
+            # 这里左矩阵的shape=(batch_size, external_input_depth + coaler_input_depth + self._coaler_num_units)
+            # 右矩阵的shape=(external_input_depth + coaler_input_depth + self._coaler_num_units, 4 * _coaler_num_units)
+            # coaler_gate_inputs.shape==(batch_size, 4 * _coaler_num_units)
+            # 注意bias_add是一个二维矩阵每一行都加一个一维的行向量
+            coaler_gate_inputs = math_ops.matmul( 
                 array_ops.concat([coaler_inputs, coaler_h], 1), self._coaler_kernel)
             coaler_gate_inputs = nn_ops.bias_add(coaler_gate_inputs, self._coaler_bias)
 
+            # 通过前面的拼接、矩阵乘法一次性把z（这里对应coaler_j）,z^i,z^f,z^o算好（效率高），现在把计算完的结果拆成四个小矩阵
+            # shape==(batch_size, _coaler_num_units)
             coaler_i, coaler_j, coaler_f, coaler_o = array_ops.split(
                 value=coaler_gate_inputs, num_or_size_splits=4, axis=one)
 
             coaler_forget_bias_tensor = constant_op.constant(self._forget_bias, dtype=coaler_f.dtype)
             # Note that using `add` and `multiply` instead of `+` and `*` gives a
             # performance improvement. So using those at the cost of readability.
-            add = math_ops.add
-            multiply = math_ops.multiply
+            add = math_ops.add # 注意不是矩阵加法，是一个tensor和一个标量（shape=()）相加
+            multiply = math_ops.multiply # 注意这里不是矩阵乘法，是Hadamard Product，逐元素相乘
             coaler_new_c = add(multiply(coaler_c, sigmoid(add(coaler_f, coaler_forget_bias_tensor))),
-                               multiply(sigmoid(coaler_i), self._activation(coaler_j)))
-            coaler_new_h = multiply(self._activation(coaler_new_c), sigmoid(coaler_o))
+                               multiply(sigmoid(coaler_i), self._activation(coaler_j))) # shape==(batch_size, _coaler_num_units)
+            coaler_new_h = multiply(self._activation(coaler_new_c), sigmoid(coaler_o))  # shape==(batch_size, _coaler_num_units)
 
-        with tf.variable_scope('burner'):
+        with tf.compat.v1.variable_scope('burner'):
             # inputs = self.batch_normalization(inputs, 'coal_mill_bn')
             # only dropout coaler output
+            # 【注意利用的是更新前的coaler_h! 但这似乎和论文的不符？论文是把h_c^t传下去而不是h_c^{t-1}？？？】
             if _should_dropout(self._output_keep_prob):
                 coaler_h = nn_ops.dropout(coaler_h, keep_prob=self._output_keep_prob)
 
-            burner_gate_inputs = math_ops.matmul(
+            # 这里左矩阵的shape=(batch_size, burner_input_depth + self._burner_num_units + self._coaler_num_units)
+            # 右矩阵的shape=(burner_input_depth + self._burner_num_units + self._coaler_num_units, 4 * self._burner_num_units)
+            # burner_gate_inputs.shape == (batch_size, 4 * self._burner_num_units)
+            burner_gate_inputs = math_ops.matmul( # 这里concat的东西变成了三个，多了一个上一个流程的hidden layer
                 array_ops.concat([burner_inputs, burner_h, coaler_h], 1), self._burner_kernel)
             burner_gate_inputs = nn_ops.bias_add(burner_gate_inputs, self._burner_bias)
 
@@ -374,7 +363,7 @@ class SimulatorRNNCell_old(LayerRNNCell):
                                multiply(sigmoid(burner_i), self._activation(burner_j)))
             burner_new_h = multiply(self._activation(burner_new_c), sigmoid(burner_o))
 
-        with tf.variable_scope('steamer'):
+        with tf.compat.v1.variable_scope('steamer'):
             # inputs = self.batch_normalization(inputs, 'coal_mill_bn')
             # only dropout burner output
             if _should_dropout(self._output_keep_prob):
@@ -399,18 +388,19 @@ class SimulatorRNNCell_old(LayerRNNCell):
         new_c = tuple((coaler_new_c, burner_new_c, steamer_new_c))
         new_h = tuple((coaler_new_h, burner_new_h, steamer_new_h))
         # concat_h = array_ops.concat([coaler_new_h, burner_new_h, steamer_new_h], axis=1)
-        new_state = LSTMStateTuple(new_c, new_h)
+        new_state = LSTMStateTuple(new_c, new_h) # 就是一个tuple，只是给它起了个别名
         return new_h, new_state
 
 
 def orthogonal_lstm_initializer():
-    def orthogonal(shape, dtype=tf.float32, partition_info=None):
+    def orthogonal(shape, dtype=tf.float32, partition_info=None): # 正交规范化？好像有助于缓解梯度爆炸或消失
         # taken from https://github.com/cooijmanstim/recurrent-batch-normalization
         # taken from https://gist.github.com/kastnerkyle/f7464d98fe8ca14f2a1a
         """ benanne lasagne ortho init (faster than qr approach)"""
+        # 比如把一个shape=(2,3,4)的一个tensor拍扁，就变成shape=(2,12)
         flat_shape = (shape[0], np.prod(shape[1:]))
-        a = np.random.normal(0.0, 1.0, flat_shape)
-        u, _, v = np.linalg.svd(a, full_matrices=False)
+        a = np.random.normal(0.0, 1.0, flat_shape) # 就是N(0, 1^2)=N(0,1)的高斯分布
+        u, _, v = np.linalg.svd(a, full_matrices=False) # 奇异值分解?
         q = u if u.shape == flat_shape else v  # pick the one with the correct shape
         q = q.reshape(shape)
         return tf.constant(q[:shape[0], :shape[1]], dtype)
