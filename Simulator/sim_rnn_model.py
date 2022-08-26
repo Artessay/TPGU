@@ -3,7 +3,7 @@ import numpy as np
 import os
 import random
 import time
-from simrnn_cell import SimulatorRNNCell
+from sim_rnn_cell import SimulatorRNNCell
 
 class RNNSimulatorModel(object):
     def __init__(self,
@@ -32,10 +32,10 @@ class RNNSimulatorModel(object):
         x = tf.placeholder(tf.float32,[None,32])上，下一次传入的x都替换掉上一次传入的x，
         这样就对于所有传入的minibatch x就只会产生一个op，不会产生其他多余的op，进而减少了graph的开销。
         placeholder仅限于tensorflow 1.x
-        inputs是三维的，第一维不定，后面两维应该就是.csv的一部分？
+        inputs是三维的，第一维不定，后面两维应该就是.csv的一部分
         [有关placeholder](https://blog.csdn.net/hgnuxc_1993/article/details/118164675)
         """
-        # inputs.shape == (batch_size, self.num_steps, table_col) == (batch_size, self.num_steps, self.input_size)
+        # inputs.shape == (batch_size, self.num_steps, self.input_size)
         # targets.shape == (batch_size, self.output_size)
         self.inputs = tf.compat.v1.placeholder(tf.float32, [None, self.n_steps, self.input_size], name="inputs")
         self.targets = tf.compat.v1.placeholder(tf.float32, [None, self.output_size], name="targets")
@@ -63,7 +63,7 @@ class RNNSimulatorModel(object):
         cell_outputs, cell_final_state = tf.nn.dynamic_rnn( # 应该就是返回call的结果(new_h, new_state)，在这里还调用了self.cell的build和call方法
             self.cell, self.inputs, initial_state=self.cell_init_state, time_major=False, scope="dynamic_rnn")
         """cell_outputs是一个三元元组，三个元素的shape分别=(1,10,256),(1,10,128),(1,10,128)
-            也就是cell_outputs.get_shape() = (batch_size, num_steps, cell_size)
+            也就是cell_outputs[i].get_shape() = (batch_size, num_steps, cell_size), i=0,1,2
 
            cell_final_state是这样一个元组，
            LSTMStateTuple(
@@ -120,6 +120,11 @@ class RNNSimulatorModel(object):
         self.loss = self.mse + self.l2_loss
 
         # gradients clip
+        """
+        clip_by_global_norm的理解：https://zhuanlan.zhihu.com/p/46894386
+        （那篇博客2.有笔误，不是avg_norm是global_norm）
+        范数的文章：https://www.jianshu.com/p/6cf5d60db634
+        """
         grads, _ = tf.clip_by_global_norm(tf.gradients(self.loss, self.tv), self.grad_clip)
         # 似乎有三种optimizer可以用
         # optimizer = tf.train.MomentumOptimizer(self.learning_rate, 0.9)
@@ -135,4 +140,30 @@ class RNNSimulatorModel(object):
         # for var in tf.trainable_variables():
         #     tf.summary.histogram(var.name, var)
         self.merged_summ = tf.compat.v1.summary.merge_all()
+        # self.modelDebugger() #如有需要可以查看
 
+    def modelDebugger(self):
+        print("------------------modelDebugger----------------------")
+        print("self.inputs:",np.shape(self.inputs))
+        print("self.targets:",np.shape(self.targets))
+        print("self.learning_rate:",np.shape(self.learning_rate))
+        print("self.keep_prob:",np.shape(self.keep_prob))
+        print("self.cell_init_state:",np.shape(self.cell_init_state))
+        print("self.cell_init_state[0][0]:",np.shape(self.cell_init_state[0][0]))
+        print("self.cell_init_state[0][1]:",np.shape(self.cell_init_state[0][1]))
+        print("self.cell_init_state[0][2]:",np.shape(self.cell_init_state[0][2]))
+        print("self.cell_init_state[1][0]:",np.shape(self.cell_init_state[1][0]))
+        print("self.cell_init_state[1][1]:",np.shape(self.cell_init_state[1][1]))
+        print("self.cell_init_state[1][2]:",np.shape(self.cell_init_state[1][2]))
+        print("self.coaler_output:",np.shape(self.coaler_output))
+        print("self.burner_output:",np.shape(self.burner_output))
+        print("self.steamer_output:",np.shape(self.steamer_output))
+        print("self.coaler_pred:",np.shape(self.coaler_pred))
+        print("self.burner_pred:",np.shape(self.burner_pred))
+        print("self.steamer_pred:",np.shape(self.steamer_pred))
+        print("self.pred:",np.shape(self.pred))
+        print("self.l2_loss:",np.shape(self.l2_loss))
+        print("self.mse:",np.shape(self.mse))
+        print("self.loss:",np.shape(self.loss))
+        print("Press Enter to continue...", end="")
+        input()

@@ -3,12 +3,11 @@ import numpy as np
 import pprint
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-# import tf_slim as slim #因为tensorflow 2.x没有contrib，所以用这个
 import sys
 # 添加环境变量，这样才能引入下面两个自己写的模块
 sys.path.append('../')
 
-from simrnn_model import RNNSimulatorModel
+from sim_rnn_model import RNNSimulatorModel
 from data_model import BoilerDataSet
 # flags是一个指针，也就是后面实际上调用的是tf.app.flags.DEFINE_integer()
 # 如果是tensorflow 2.x的版本，要改成tf.compat.v1.app.flags，因为2.x已经没有.app了
@@ -83,13 +82,42 @@ pp = pprint.PrettyPrinter()
 if not os.path.exists("logs"):
     os.mkdir("logs")
 
-# 展示所有的变量
-def show_all_variables():
-    # 仅可以查看可训练的变量，即trainable=True的变量
-    model_vars = tf.trainable_variables()
-    # 展示变量
-    slim.model_analyzer.analyze_vars(model_vars, print_info=True)
+# 展示所有的变量，两种选项，可以选择用/不用prettyprint
+def show_all_variables(pretty=False):
+    if pretty:
+        # 仅可以查看可训练的变量，即trainable=True的变量
+        model_vars = tf.compat.v1.trainable_variables()
+        # 展示变量
+        slim.model_analyzer.analyze_vars(model_vars, print_info=True)
+    else:
+        # count the parameters in our model
+        total_parameters = 0
+        for variable in tf.compat.v1.trainable_variables():
+            # shape is an array of tf.Dimension
+            shape = variable.get_shape()
+            print(variable,": ",shape)
+            # print(len(shape))
+            variable_parameters = 1
+            for dim in shape:
+                # print(dim)
+                variable_parameters *= dim.value
+            # print(variable_parameters)
+            total_parameters += variable_parameters
+        print('total parameters: {}'.format(total_parameters))
 
+def prepareLogSave():
+    model_name = "sim_rnn"
+    logdir = './logs/{}-{}-{}-{}-{}-{:.2f}-{:.4f}-{:.2f}-{:.5f}/'.format(
+        model_name, cell_config.num_units[0], cell_config.num_units[1], cell_config.num_units[2],
+        FLAGS.num_steps, FLAGS.keep_prob, FLAGS.learning_rate, FLAGS.learning_rate_decay, FLAGS.l2_weight)
+    model_dir = logdir + 'saved_models/'
+
+    if not os.path.exists(logdir):
+        os.mkdir(logdir)
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+    results_dir = logdir + 'results/'
+    return model_dir, logdir, results_dir
 
 def main(_):
     # 无法执行sess.run()的原因是tensorflow版本不同导致的，tensorflow版本2.0无法兼容版本1.0.所以需要加这一句
@@ -125,39 +153,15 @@ def main(_):
     tf.compat.v1.reset_default_graph()
     rnn_model = RNNSimulatorModel(cell_config(), FLAGS)
 
-    # count the parameters in our model
-    total_parameters = 0
-    for variable in tf.compat.v1.trainable_variables():
-        # shape is an array of tf.Dimension
-        shape = variable.get_shape()
-        print(variable,": ",shape)
-        # print(len(shape))
-        variable_parameters = 1
-        for dim in shape:
-            # print(dim)
-            variable_parameters *= dim.value
-        # print(variable_parameters)
-        total_parameters += variable_parameters
-    print('total parameters: {}'.format(total_parameters))
+    show_all_variables()
 
-    # path for log saving
-    model_name = "sim_rnn"
-    logdir = './logs/{}-{}-{}-{}-{}-{:.2f}-{:.4f}-{:.2f}-{:.5f}/'.format(
-        model_name, cell_config.num_units[0], cell_config.num_units[1], cell_config.num_units[2],
-        FLAGS.num_steps, FLAGS.keep_prob, FLAGS.learning_rate, FLAGS.learning_rate_decay, FLAGS.l2_weight)
-    model_dir = logdir + 'saved_models/'
-
-    if not os.path.exists(logdir):
-        os.mkdir(logdir)
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
-    results_dir = logdir + 'results/'
+    model_dir, logdir, results_dir= prepareLogSave() # path for log saving
 
     with tf.compat.v1.Session(config=run_config) as sess:
-        summary_writer = tf.compat.v1.summary.FileWriter(logdir)
+        summary_writer = tf.compat.v1.summary.FileWriter(logdir, sess.graph) # 记录训练的过程
 
-        sess.run(tf.compat.v1.global_variables_initializer())
-        saver = tf.compat.v1.train.Saver()
+        sess.run(tf.compat.v1.global_variables_initializer()) # 初始化所有用tf.Variable定义的变量
+        saver = tf.compat.v1.train.Saver() # saver可以保存所有能被保存的变量
 
         iter = 0
         valid_losses = [np.inf]
@@ -171,8 +175,8 @@ def main(_):
             ) # learning_rate每一轮都在减小，指数级减小
 
             for batch_X, batch_y in boiler_dataset.generate_one_epoch(train_X, train_y, FLAGS.batch_size):
-                # batch_X.shape=(batch_size, self.num_steps, table_col)
-                # batch_y.shape=(batch_size, table_col2)
+                # batch_X.shape=(batch_size, self.num_steps, input_size)
+                # batch_y.shape=(batch_size, output_size)
                 iter += 1
                 train_data_feed = {
                     rnn_model.learning_rate: learning_rate,
@@ -184,9 +188,9 @@ def main(_):
                 # sess.run()第一个参数是计算什么东西，这里是计算rnn_model中的这三个参数，第二个是喂什么东西进去
                 train_loss, _, merged_summ = sess.run(
                     [rnn_model.loss, rnn_model.train_opt, rnn_model.merged_summ], train_data_feed)
-                if iter % FLAGS.save_log_iter == 0:
+                if iter % FLAGS.save_log_iter == 0: # 每隔save_log_iter轮记录训练效果
                     summary_writer.add_summary(merged_summ, iter)
-                # 交叉验证（一般用于数据量不是很充足的时候，比如少于10000条）
+                # 交叉验证（一般用于数据量不是很充足的时候，比如少于10000条），这里每隔display_iter轮做一次验证
                 if iter % FLAGS.display_iter == 0:
                     valid_loss = 0
                     for val_batch_X, val_batch_y in boiler_dataset.generate_one_epoch(val_X, val_y, FLAGS.batch_size):
@@ -204,7 +208,7 @@ def main(_):
                         value=[tf.Summary.Value(tag="valid_loss", simple_value=valid_loss)])
                     summary_writer.add_summary(valid_loss_sum, iter)
 
-                    if valid_loss < min(valid_losses[:-1]):
+                    if valid_loss < min(valid_losses[:-1]): # 如果目前的损失是最小的，就先保存模型
                         print('iter {}\tvalid_loss = {:.6f}\tmodel saved!!'.format(
                             iter, valid_loss))
                         saver.save(sess, model_dir +

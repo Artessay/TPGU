@@ -70,6 +70,5 @@ class BoilerDataSet(object):
             # yield就是不断返回东西，最后在调用函数的地方可以收到一个迭代器，
             # 遍历即可拿到for循环的每一次返回值
             # 每一次的返回值形状如下：
-            # batch_X.shape=(batch_size, self.num_steps, table_col)
-            # batch_y.shape=(batch_size, table_col2)
-            # 其中table_col, table_col2见上面定义
+            # batch_X.shape=(batch_size, self.num_steps, input_size)
+            # batch_y.shape=(batch_size, output_size)
