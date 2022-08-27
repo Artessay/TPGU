@@ -7,7 +7,7 @@ from RL.cost_critic_network import CostCriticNetwork
 
 from RL.actor_network import ActorNetwork
 from RL.replay_buffer import ReplayBuffer
-from RL.util import *
+from RL.utility import *
 
 # EPSILON定义一个极小值
 EPSILON = 1e-5
