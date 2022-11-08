@@ -1,0 +1,34 @@
+# .gqlgen.yml example
+#
+# Refer to https://gqlgen.com/config/
+# for detailed .gqlgen.yml documentation.
+
+schema:
+- schema.graphql
+exec:
+  filename: generated.go
+model:
+  filename: models_gen.go
+resolver:
+  filename: resolver.go
+  type: Resolver
+autobind: []
+models:
+  Station: 
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/station.Station
+  StationGraph:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/stationgraph.StationGraph
+  StationNode:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/stationgraph.StationNode
+  MonteCarloTreeNodeValues:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/algorithm.MonteCarloTreeNodeValues
+  MonteCarloTreeNode:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/algorithm.MonteCarloTreeNode
+  MonteCarloTree:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/algorithm.MonteCarloTree
+  RouteList:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/skyline.RouteList
+  Route:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/pkg/skyline.Route
+  Location:
+    model: git.zjuvis.org/rnvis/bus-routing-backend/cmd/gqlapi.Location

@@ -1,0 +1,103 @@
+# The data structure of Monte Carlo Tree
+type MonteCarloTreeNodeValues {
+    t: Float!
+    num: Float!
+    count: Int!
+    w: Float!
+    numSkylines: Int!
+    uValue: Float!
+}
+
+type MonteCarloTreeNode {
+    values: MonteCarloTreeNodeValues!
+    n: Int!
+    actions: [MonteCarloTreeNode!]!
+    availableActions: [StationNode!]!
+	sNode: StationNode!
+	parent: MonteCarloTreeNode!
+}
+
+type MonteCarloTree {
+    done: Boolean!
+    root: MonteCarloTreeNode!
+    # graph: StationGraph!
+    alpha: Float!
+    nodes: [MonteCarloTreeNode!]!
+}
+
+# the data structure of plannings
+type RouteList {
+    routes: [Route!]!
+}
+
+type Station {
+    id: Int!
+    name: String!
+    lon: Float!
+    lat: Float!
+    inGraph: Boolean!
+    numTrips: Int!
+    neighbors: [Int!]!
+}
+
+type Location {
+    id: Int!
+    lon: Float!
+    lat: Float!
+}
+
+type StationGraph {
+    originNode: StationNode!
+    destNode: StationNode!
+    givenStops: [StationNode!]!
+    nodes: [StationNode!]!
+}
+
+type StationNode {
+    s: Station!
+    prev: [StationNode!]!
+    next: [StationNode!]!
+}
+
+type Route {
+    r: [Station!]!
+    criteria: [Float!]!
+}
+
+type ExistBusRoute {
+    id: Int!
+    name: String!
+    stations: [Int!]
+}
+
+type Query {
+    plannings(username: String!): RouteList!
+    locations(idxs: [Int!]!): [Location!]!
+    stations: [Station!]!
+    existBusRouteSet: [ExistBusRoute!]!
+}
+
+input NewRoutePlanning {
+    originId: Int!
+    destId: Int!
+}
+
+input NewStationGraph {
+    origin: Int!
+    dest: Int!
+    stops: [Int!]!
+}
+
+type AfterGraphBuilt {
+    graph: StationGraph!
+    username: String!
+}
+
+type Mutation {
+    createRoutePlanning(input: NewRoutePlanning!): RouteList!
+    createStationGraph(input: NewStationGraph!): AfterGraphBuilt!
+}
+
+type Subscription {
+    monteCarloTreeStateChanged(username: String!): MonteCarloTree!
+}
