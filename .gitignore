@@ -1,6 +1,7 @@
 # Data
 *.csv
 *.xls
+*.xlsm
 *.xlsx
 *.pdf
 *.txt
