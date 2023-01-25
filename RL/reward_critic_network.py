@@ -190,9 +190,3 @@ class RewardCriticNetwork(object):
         print 'save reward-critic-network...',time_step
         self.saver.save(self.sess, 'saved_reward_critic_networks/' + 'reward-critic-network', global_step = time_step)
 '''
-
-
-
-
-
-
