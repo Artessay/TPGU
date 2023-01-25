@@ -3,11 +3,11 @@ import numpy as np
 import math
 
 
-LAYER1_SIZE = 256
-LAYER2_SIZE = 256
-LEARNING_RATE = 0.0001
-TAU = 0.001
-L2 = 0.0001
+CRITIC_LAYER1_SIZE = 256
+CRITIC_LAYER2_SIZE = 256
+CRITIC_LEARNING_RATE = 0.0001
+CRITIC_TAU = 0.001
+CRITIC_L2 = 0.0001
 
 
 def weight_variable(shape):
@@ -56,27 +56,27 @@ class CostCriticNetwork(object):
     def create_training_method(self):
         # Define training optimizer
         self.z_input = tf.placeholder("float", [None, 1])
-        weight_decay = tf.add_n([L2 * tf.nn.l2_loss(var) for var in self.cost_net])
+        weight_decay = tf.add_n([CRITIC_L2 * tf.nn.CRITIC_L2_loss(var) for var in self.cost_net])
         self.cost_cost = tf.reduce_mean(tf.square(self.z_input - self.cost_value_output)) + weight_decay
-        self.optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.cost_cost)
+        self.optimizer = tf.train.AdamOptimizer(CRITIC_LEARNING_RATE).minimize(self.cost_cost)
         self.action_gradients_cost = tf.gradients(self.cost_value_output, self.action_input)
 
 
 
     # def create_cost_network(self, state_dim, action_dim):
     #     # the layer size could be changed
-    #     layer1_size = LAYER1_SIZE
-    #     layer2_size = LAYER2_SIZE
+    #     CRITIC_LAYER1_SIZE = CRITIC_LAYER1_SIZE
+    #     CRITIC_LAYER2_SIZE = CRITIC_LAYER2_SIZE
     #
     #     state_input = tf.placeholder("float", [None, state_dim])
     #     action_input = tf.placeholder("float", [None, action_dim])
     #
-    #     W1 = self.variable([state_dim, layer1_size], state_dim)
-    #     b1 = self.variable([layer1_size], state_dim)
-    #     W2 = self.variable([layer1_size, layer2_size], layer1_size + action_dim)
-    #     W2_action = self.variable([action_dim, layer2_size], layer1_size + action_dim)
-    #     b2 = self.variable([layer2_size], layer1_size + action_dim)
-    #     W3 = tf.Variable(tf.random_uniform([layer2_size, 1], -3e-3, 3e-3))
+    #     W1 = self.variable([state_dim, CRITIC_LAYER1_SIZE], state_dim)
+    #     b1 = self.variable([CRITIC_LAYER1_SIZE], state_dim)
+    #     W2 = self.variable([CRITIC_LAYER1_SIZE, CRITIC_LAYER2_SIZE], CRITIC_LAYER1_SIZE + action_dim)
+    #     W2_action = self.variable([action_dim, CRITIC_LAYER2_SIZE], CRITIC_LAYER1_SIZE + action_dim)
+    #     b2 = self.variable([CRITIC_LAYER2_SIZE], CRITIC_LAYER1_SIZE + action_dim)
+    #     W3 = tf.Variable(tf.random_uniform([CRITIC_LAYER2_SIZE, 1], -3e-3, 3e-3))
     #     b3 = tf.Variable(tf.random_uniform([1], -3e-3, 3e-3))
     #
     #     layer1 = tf.nn.relu(tf.matmul(state_input, W1) + b1)
@@ -87,21 +87,21 @@ class CostCriticNetwork(object):
 
     def create_cost_network(self, state_dim, action_dim):
         # the layer size could be changed
-        layer1_size = LAYER1_SIZE
-        layer2_size = LAYER2_SIZE
+        CRITIC_LAYER1_SIZE = CRITIC_LAYER1_SIZE
+        CRITIC_LAYER2_SIZE = CRITIC_LAYER2_SIZE
 
         state_input = tf.placeholder("float", [None, state_dim])
         action_input = tf.placeholder("float", [None, action_dim])
 
         # Input -> Hidden Layer
-        w1 = weight_variable([state_dim, layer1_size])
-        b1 = bias_variable([layer1_size])
+        w1 = weight_variable([state_dim, CRITIC_LAYER1_SIZE])
+        b1 = bias_variable([CRITIC_LAYER1_SIZE])
         # Hidden Layer -> Hidden Layer + Action
-        w2 = weight_variable([layer1_size, layer2_size])
-        w2a = weight_variable([action_dim, layer2_size])
-        b2 = bias_variable([layer2_size])
+        w2 = weight_variable([CRITIC_LAYER1_SIZE, CRITIC_LAYER2_SIZE])
+        w2a = weight_variable([action_dim, CRITIC_LAYER2_SIZE])
+        b2 = bias_variable([CRITIC_LAYER2_SIZE])
         # Hidden Layer -> Output (Q)
-        w3 = weight_variable([layer2_size, 1])
+        w3 = weight_variable([CRITIC_LAYER2_SIZE, 1])
         b3 = bias_variable([1])
 
         # 1st Hidden layer, OPTION: Softmax, relu, tanh or sigmoid
@@ -118,7 +118,7 @@ class CostCriticNetwork(object):
         state_input = tf.placeholder("float", [None, state_dim])
         action_input = tf.placeholder("float", [None, action_dim])
 
-        ema = tf.train.ExponentialMovingAverage(decay=1 - TAU)
+        ema = tf.train.ExponentialMovingAverage(decay=1 - CRITIC_TAU)
         target_update = ema.apply(net)
         target_net = [ema.average(x) for x in net]
 

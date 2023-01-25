@@ -4,10 +4,11 @@ import math
 
 
 # Hyper Parameters
-ACTOR_LAYER1_SIZE = 256
-ACTOR_LAYER2_SIZE = 256
-ACTOR_LEARNING_RATE = 0.0001
-ACTOR_TAU = 0.001
+LAYER1_SIZE = 256
+LAYER2_SIZE = 256
+LAYER3_SIZE = 128
+LEARNING_RATE = 0.0001
+TAU = 0.001
 
 
 def weight_variable(shape, name):
@@ -19,8 +20,23 @@ def bias_variable(shape, name):
     initial = tf.constant(0.03, shape=shape)
     return tf.Variable(initial, name)
 
+class ActorModel(object):
+    """
+        actor 网络定义: 输入s,输出动作a
+        :param name: 网络名称
+        :param actor_trainable: 是否可以被训练，target网络是不能被训练的，设置False，预测网络设置为True
+        :return: actor 网络模型
+    """
+    def __init__(self, input_config, trainable, name):
+        self.state_dimension = input_config.state_dimension
+        self.model = tf.keras.Sequential([
+            tf.keras.layers.Input(shape=(self.state_dimension,), name="inputs"),
+            tf.keras.layers.Dense(LAYER1_SIZE, activation='relu'),
+            tf.keras.layers.Dense(LAYER2_SIZE, activation='relu'),
+            tf.keras.layers.Dense(LAYER3_SIZE, activation='sigmoid'),
+        ])
 
-class ActorNetwork(object):
+class ActorNetworks(object):
     """ Map: state + limit_load -> action """
 
     def __init__(self, sess, input_config, load_model, summ_writer):
@@ -63,8 +79,8 @@ class ActorNetwork(object):
         # self.actor_gradients, _ = tf.clip_by_global_norm(self.actor_gradients, clip_norm=self.clip_norm)
 
         # extra_ops = tf.get_collection('actor_parameters_extra_option')
-        # apply_op = tf.train.AdamOptimizer(ACTOR_LEARNING_RATE).apply_gradients(zip(self.unnormalized_actor_gradients, self.net))
-        apply_op = tf.train.RMSPropOptimizer(ACTOR_LEARNING_RATE).apply_gradients(zip(self.unnormalized_actor_gradients, self.net))
+        # apply_op = tf.train.AdamOptimizer(LEARNING_RATE).apply_gradients(zip(self.unnormalized_actor_gradients, self.net))
+        apply_op = tf.train.RMSPropOptimizer(LEARNING_RATE).apply_gradients(zip(self.unnormalized_actor_gradients, self.net))
 
         # train_ops = [apply_op] + extra_ops
         # self.optimizer = tf.group(*apply_op)
@@ -73,22 +89,22 @@ class ActorNetwork(object):
         diff = self.action_output - self.target_action_output
         self.mse = tf.reduce_mean(tf.square(diff))
         pretrain_grad = tf.gradients(self.mse, self.net)
-        self.pretrain_update = tf.train.AdamOptimizer(ACTOR_LEARNING_RATE).apply_gradients(
+        self.pretrain_update = tf.train.AdamOptimizer(LEARNING_RATE).apply_gradients(
             zip(pretrain_grad, self.net))
 
 
 
     def create_network(self, state_dim, action_dim):
-        ACTOR_LAYER1_SIZE = ACTOR_LAYER1_SIZE
-        ACTOR_LAYER2_SIZE = ACTOR_LAYER2_SIZE
+        layer1_size = LAYER1_SIZE
+        layer2_size = LAYER2_SIZE
 
         state_input = tf.placeholder("float", [None, state_dim])
 
-        w1 = self.variable([state_dim, ACTOR_LAYER1_SIZE], state_dim)
-        b1 = self.variable([ACTOR_LAYER1_SIZE], state_dim)
-        w2 = self.variable([ACTOR_LAYER1_SIZE, ACTOR_LAYER2_SIZE], ACTOR_LAYER1_SIZE)
-        b2 = self.variable([ACTOR_LAYER2_SIZE], ACTOR_LAYER1_SIZE)
-        w3 = tf.Variable(tf.random_uniform([ACTOR_LAYER2_SIZE, action_dim], -3e-3, 3e-3))
+        w1 = self.variable([state_dim, layer1_size], state_dim)
+        b1 = self.variable([layer1_size], state_dim)
+        w2 = self.variable([layer1_size, layer2_size], layer1_size)
+        b2 = self.variable([layer2_size], layer1_size)
+        w3 = tf.Variable(tf.random_uniform([layer2_size, action_dim], -3e-3, 3e-3))
         b3 = tf.Variable(tf.random_uniform([action_dim], -3e-3, 3e-3))
 
         layer1 = tf.nn.relu(tf.matmul(state_input, w1) + b1)
@@ -111,19 +127,19 @@ class ActorNetwork(object):
         return state_input, action_output, [w1, b1, w2, b2, w3, b3]
 
     # def create_network(self, state_dim, action_dim):
-    #     ACTOR_LAYER1_SIZE = ACTOR_LAYER1_SIZE
-    #     ACTOR_LAYER2_SIZE = ACTOR_LAYER2_SIZE
+    #     layer1_size = LAYER1_SIZE
+    #     layer2_size = LAYER2_SIZE
     #
     #     state_input = tf.placeholder("float", [None, state_dim])
     #
     #     # Input -> Hidden Layer
-    #     w1 = weight_variable([self.state_dim, ACTOR_LAYER1_SIZE], 'W1')
-    #     b1 = bias_variable([ACTOR_LAYER1_SIZE], 'b1')
+    #     w1 = weight_variable([self.state_dim, layer1_size], 'W1')
+    #     b1 = bias_variable([layer1_size], 'b1')
     #     # Hidden Layer -> Hidden Layer
-    #     w2 = weight_variable([ACTOR_LAYER1_SIZE, ACTOR_LAYER2_SIZE], 'W2')
-    #     b2 = bias_variable([ACTOR_LAYER2_SIZE], 'b2')
+    #     w2 = weight_variable([layer1_size, layer2_size], 'W2')
+    #     b2 = bias_variable([layer2_size], 'b2')
     #     # Hidden Layer -> Output
-    #     w3 = weight_variable([ACTOR_LAYER2_SIZE, self.action_dim], 'W3')
+    #     w3 = weight_variable([layer2_size, self.action_dim], 'W3')
     #     b3 = bias_variable([self.action_dim], 'b3')
     #
     #     # 1st Hidden layer, OPTION: Softmax, relu, tanh or sigmoid
@@ -154,7 +170,7 @@ class ActorNetwork(object):
 
     def create_target_network(self, state_dim, action_dim, net):
         state_input = tf.placeholder("float", [None, state_dim])
-        ema = tf.train.ExponentialMovingAverage(decay=1 - ACTOR_TAU)
+        ema = tf.train.ExponentialMovingAverage(decay=1 - TAU)
         target_update = ema.apply(net)
         target_net = [ema.average(x) for x in net]
 
@@ -219,15 +235,14 @@ class ActorNetwork(object):
         print('save actor-network...', episode)
         self.saver.save(self.sess, 'saved_actor_networks/' + 'actor-network', global_step=episode)
 
-'''
-    def load_network(self):
-        self.saver = tf.train.Saver()
-        checkpoint = tf.train.get_checkpoint_state("saved_actor_networks")
-        if checkpoint and checkpoint.model_checkpoint_path:
-            self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
-            print "Successfully loaded:", checkpoint.model_checkpoint_path
-        else:
-            print "Could not find old network weights"
 
-'''
+    # def load_network(self):
+    #     self.saver = tf.train.Saver()
+    #     checkpoint = tf.train.get_checkpoint_state("saved_actor_networks")
+    #     if checkpoint and checkpoint.model_checkpoint_path:
+    #         self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
+    #         print("Successfully loaded:", checkpoint.model_checkpoint_path)
+    #     else:
+    #         print("Could not find old network weights")
+
 
