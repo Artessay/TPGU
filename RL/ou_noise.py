@@ -6,7 +6,7 @@
 # --------------------------------------
 
 import numpy as np
-import numpy.random as nr
+# import numpy.random as nr
 
 
 class OUNoise:
@@ -29,7 +29,7 @@ class OUNoise:
 
     def noise(self):
         x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * nr.randn(len(x))
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
         self.state = x + dx * self.weight
         return self.state
 
