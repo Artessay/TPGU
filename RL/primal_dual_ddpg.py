@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import os
 from RL.ou_noise import OUNoise
 from RL.reward_critic_network import RewardCriticNetwork
 from RL.cost_critic_network import CostCriticNetwork
@@ -37,15 +36,15 @@ class PrimalDualDDPG(object):
         self.step = 0
 
 
-        if is_batch_norm:
-            self.rewward_critic_network = RewardCriticNetwork_bn(self.sess, self.state_dim, self.action_dim)
-            self.cost_critic_network = CostCriticNetwork_bn(self.sess, self.state_dim, self.action_dim)
-            self.actor_network = ActorNetwork_bn(self.sess, self.state_dim, self.action_dim)
+        # if is_batch_norm:
+        #     self.rewward_critic_network = RewardCriticNetwork(self.sess, self.state_dim, self.action_dim)
+        #     self.cost_critic_network = CostCriticNetwork(self.sess, self.state_dim, self.action_dim)
+        #     self.actor_network = ActorNetwork(self.sess, self.state_dim, self.action_dim)
 
-        else:
-            self.reward_critic_network = RewardCriticNetwork(self.sess, input_config, self.summay_writer)
-            self.cost_critic_network = CostCriticNetwork(self.sess, input_config, self.summay_writer)
-            self.actor_network = ActorNetwork(self.sess, input_config, load_model=False, summ_writer=self.summay_writer)
+        # else:
+        self.reward_critic_network = RewardCriticNetwork(self.sess, input_config, self.summay_writer)
+        self.cost_critic_network = CostCriticNetwork(self.sess, input_config, self.summay_writer)
+        self.actor_network = ActorNetwork(self.sess, input_config, load_model=False, summ_writer=self.summay_writer)
 
         # initialize replay buffer
         self.replay_buffer = ReplayBuffer(REPLAY_MEMORY_SIZE)
@@ -172,19 +171,3 @@ class PrimalDualDDPG(object):
 
     def save_model(self):
         self.saver.save(sess=self.sess, save_path=self.save_path)  #global_step=10,会自动生成名字-10
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

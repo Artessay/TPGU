@@ -164,56 +164,6 @@ def compute_reward(state):
     return 10*(EFFI_WEIGHT * efficiency - (1-EFFI_WEIGHT) * emission)
 
 
-# def compute_cost(state):
-#     lim_load = get_lim_load(state) * (inv_norm.loc['lim_load']['max'] - inv_norm.loc['lim_load']['min']) + inv_norm.loc['lim_load']['min']
-#     load = get_load(state) * (inv_norm.loc['#1机组锅炉负荷']['max'] - inv_norm.loc['#1机组锅炉负荷']['min']) + inv_norm.loc['#1机组锅炉负荷']['min']
-#     steam_temp = get_steam_temp(state) * (inv_norm.loc['锅炉主蒸汽温度']['max'] - inv_norm.loc['锅炉主蒸汽温度']['min']) + inv_norm.loc['锅炉主蒸汽温度']['min']
-#     given_steam_pres = get_given_steam_pres(load)
-#     steam_pres = get_steam_pres(state) * (inv_norm.loc['主蒸汽压力']['max'] - inv_norm.loc['主蒸汽压力']['min']) + inv_norm.loc['主蒸汽压力']['min']
-#     # neg_pressure = get_neg_pres(state) * (inv_norm.loc['炉膛负压']['max'] - inv_norm.loc['炉膛负压']['min']) + inv_norm.loc['炉膛负压']['min']
-#
-#     # cost 1, 负荷:lim_load ~ limload+25
-#     if len(state.shape) == 1:
-#         if load - lim_load > 25 or load < lim_load:
-#             cost_load = 1
-#         else:
-#             cost_load = 0
-#     else:
-#         cost_load = np.zeros([len(state), 1])
-#         cost_load[(load-lim_load > 25) | (load-lim_load < 0)] = 1
-#
-#     # else:
-#     #     if diff < 0.01:
-#     #         return 0
-#     #     elif diff < 0.1:
-#     #         return 0.2
-#     #     elif diff < 0.5:
-#     #         return 0.5
-#     #     else:
-#     #         return 1
-#
-#     # cost 2, 主蒸汽温度:569-10 ~ 569+5
-#     if len(state.shape) == 1:
-#         if steam_temp > 569+5 or steam_temp < 569-10:
-#             cost_steam_temp = 1
-#         else:
-#             cost_steam_temp = 0
-#     else:
-#         cost_steam_temp = np.zeros([len(state), 1])
-#         cost_steam_temp[(steam_temp > 569+5) | (steam_temp < 569-10)] = 1
-#
-#     # cost 3, 主蒸汽压力:given_pres-0.5 ~ given_pres+0.5
-#     if len(state.shape) == 1:
-#         if steam_pres > given_steam_pres+0.5 or steam_pres < given_steam_pres-0.5:
-#             cost_steam_pres = 1
-#         else:
-#             cost_steam_pres = 0
-#     else:
-#         cost_steam_pres = np.zeros([len(state), 1])
-#         cost_steam_pres[(steam_pres > given_steam_pres+0.5) & (steam_pres < given_steam_pres-0.5)] = 1
-#
-#     return 1/3*cost_load + 1/3*cost_steam_temp + 1/3*cost_steam_pres
-
 def compute_cost(state):
     lim_load = get_lim_load(state) * (inv_norm.loc['lim_load']['max'] - inv_norm.loc['lim_load']['min']) + inv_norm.loc['lim_load']['min']
     load = get_load(state) * (inv_norm.loc['#1机组锅炉负荷']['max'] - inv_norm.loc['#1机组锅炉负荷']['min']) + inv_norm.loc['#1机组锅炉负荷']['min']

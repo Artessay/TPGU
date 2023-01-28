@@ -45,7 +45,7 @@ def pre_train_actor_network(agent, epochs=3):
             print('-----------------pre-train actor network-----------------')
             print('epoch = {} mse = {:.4f}'.format(epoch, mse))
 
-
+# 预训练 reward critical 网络
 def pre_train_reward_critic_network(agent, epochs=3):
     replay_buffer = agent.replay_buffer
     for train_times in range(epochs):
@@ -71,7 +71,7 @@ def pre_train_reward_critic_network(agent, epochs=3):
             print('-----------------pre-train reward critic network-----------------')
             print("reward_critic: loss:{:.3f}".format(reward_critic_loss))
 
-
+# 预训练 cost critical 网络
 def pre_train_cost_critic_network(agent, epochs=3):
     replay_buffer = agent.replay_buffer
     step = 0

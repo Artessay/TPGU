@@ -71,7 +71,3 @@ class ReplayBuffer(object):
     def erase(self):
         self.buffer = deque()
         self.num_experiences = 0
-
-
-
-
